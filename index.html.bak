@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMAI Parking - B2B Business Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Firebase SDKs from CDN -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div id="app">
+
+    <!-- ─── 1. LOGIN SCREEN ─── -->
+    <div id="login-screen" class="login-screen hidden">
+      <div class="login-card">
+        <div class="login-brand">IMAI Parking</div>
+        <div class="login-subtitle">B2B SaaS Business Dashboard</div>
+        <p style="color: var(--text-2); font-size: 13px; margin-bottom: 24px">
+          Sign in with your Google account to securely access your real-device parking monitoring databases.
+        </p>
+        <button id="login-btn" class="login-btn">
+          <svg width="18" height="18" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          <span id="login-btn-text">Sign in with Google</span>
+        </button>
+        <div id="auth-error" style="margin-top: 16px; color: var(--red); font-size: 12px;" class="hidden"></div>
+      </div>
+    </div>
+
+    <!-- ─── 2. AUTH LOADING SCREEN ─── -->
+    <div id="auth-loading" class="loading-screen">
+      <div class="spinner"></div>
+      <span>Verifying Secure Access State...</span>
+    </div>
+
+    <!-- ─── 3. MAIN DASHBOARD CONTENT (AUTHENTICATED) ─── -->
+    <div id="dashboard-wrapper" class="hidden">
+      
+      <!-- TOP BAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <span class="topbar-brand">IMAI Parking</span>
+          <select id="zone-selector" class="zone-selector">
+            <!-- Dynamically Populated -->
+          </select>
+        </div>
+        <div class="topbar-right">
+          <span id="live-indicator-dot" class="live-dot"></span>
+          <span id="live-indicator-label">Live</span>
+          <span style="color: var(--border)">|</span>
+          <span id="live-clock" style="font-family: var(--mono); font-size: 12px;">--:--:--</span>
+          <span style="color: var(--border)">|</span>
+          <span id="user-email-label" style="font-size: 12px; color: var(--text-2)">--</span>
+          <button id="signout-btn" class="signout-btn" title="Sign Out">↗</button>
+        </div>
+      </header>
+
+      <!-- NAVIGATION TABS -->
+      <nav class="nav-tabs">
+        <div class="nav-tab active" data-tab="overview" id="tab-overview">Overview</div>
+        <div class="nav-tab" data-tab="billing" id="tab-billing">₹ Billing</div>
+        <div class="nav-tab" data-tab="logs" id="tab-logs">Entry / Exit Log</div>
+        <div class="nav-tab" data-tab="subscriptions" id="tab-subscriptions">Subscriptions</div>
+        <div class="nav-tab" data-tab="config" id="tab-config">Zone Config</div>
+      </nav>
+
+      <!-- DATA LOADING BAR -->
+      <div id="data-loading" class="loading-screen hidden">
+        <div class="spinner"></div>
+        <span>Syncing with LPR logs...</span>
+      </div>
+
+      <!-- MAIN CONTAINER -->
+      <main id="main-content" class="main">
+
+        <!-- ═══════════ TAB A: OVERVIEW ═══════════ -->
+        <section id="panel-overview" class="tab-panel">
+          <!-- Stat KPIs -->
+          <div class="stat-row">
+            <div class="stat-card">
+              <div class="stat-label">Total Spaces</div>
+              <div id="stat-total-spaces" class="stat-value">0</div>
+              <div class="stat-sub">Floor 1 slots</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Occupied</div>
+              <div id="stat-occupied" class="stat-value red">0</div>
+              <div id="stat-occupancy-pct" class="stat-sub">0% Utilisation</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Vacant</div>
+              <div id="stat-vacant" class="stat-value green">0</div>
+              <div class="stat-sub">Available now</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Reserved</div>
+              <div id="stat-reserved" class="stat-value amber">0</div>
+              <div class="stat-sub">VIP buffers</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Last Ticket No</div>
+              <div id="stat-tickets" class="stat-value blue">0</div>
+              <div class="stat-sub">LPR counter</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Active Passes</div>
+              <div id="stat-subs" class="stat-value purple">0</div>
+              <div class="stat-sub">B2B accounts</div>
+            </div>
+          </div>
+
+          <!-- Spot Grid & Details -->
+          <div class="three-col">
+            <div class="section">
+              <div class="section-header">
+                <span class="section-title">Parking Lot Live Grid Map</span>
+                <span class="section-meta">
+                  <span class="badge badge-green">● Vacant</span>&nbsp;
+                  <span class="badge badge-red">● Occupied</span>&nbsp;
+                  <span class="badge badge-amber">● Reserved</span>
+                </span>
+              </div>
+              <div id="spot-grid-map" class="spot-grid">
+                <!-- Dynamically Rendered -->
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-header">
+                <span class="section-title">Real-Time Space Detail</span>
+              </div>
+              <div id="spot-detail-panel" class="detail-panel">
+                <div class="empty">Select an occupied or vacant slot on the map grid to view stay parameters.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Currently Parked Table -->
+          <div class="section" style="margin-top: 18px;">
+            <div class="section-header">
+              <span class="section-title">Vehicles Currently Inside Lot</span>
+              <span id="parked-count-label" class="badge badge-green">0 Vehicles</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>License Plate</th>
+                    <th>Type</th>
+                    <th>Check-in Time</th>
+                    <th>Stay Duration</th>
+                    <th>Pricing Tier</th>
+                    <th>Estimated Charge</th>
+                  </tr>
+                </thead>
+                <tbody id="currently-parked-table-body">
+                  <!-- Dynamically Rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ═══════════ TAB B: BILLING ═══════════ -->
+        <section id="panel-billing" class="tab-panel hidden">
+          <div class="stat-row">
+            <div class="stat-card">
+              <div class="stat-label">Total Revenue Collected</div>
+              <div id="bill-total-collected" class="stat-value green">₹0</div>
+              <div class="stat-sub">Checkout cash/cards</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Live Estimated Dues</div>
+              <div id="bill-live-dues" class="stat-value amber">₹0</div>
+              <div class="stat-sub">From currently parked</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">B2B Monthly MRR</div>
+              <div id="bill-sub-revenue" class="stat-value purple">₹0</div>
+              <div class="stat-sub">Subscription base</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Paid Exits Checked</div>
+              <div id="bill-paid-exits" class="stat-value blue">0</div>
+              <div class="stat-sub">Device validation logs</div>
+            </div>
+          </div>
+
+          <div class="two-col">
+            <!-- Active Pricing Settings -->
+            <div class="section">
+              <div class="section-header">
+                <span class="section-title">Live Yield Tiers (Pricing Plan)</span>
+              </div>
+              <div id="billing-pricing-list" class="pricing-block">
+                <!-- Dynamically Rendered -->
+              </div>
+            </div>
+
+            <!-- checkout list -->
+            <div class="section">
+              <div class="section-header">
+                <span class="section-title">Recent Checkout Payments</span>
+              </div>
+              <div class="scroll-y" style="max-height: 380px;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Plate</th>
+                      <th>Stay</th>
+                      <th>Method</th>
+                      <th>Amount Paid</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billing-paid-history-body">
+                    <!-- Dynamically Rendered -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ═══════════ TAB C: LOGS ═══════════ -->
+        <section id="panel-logs" class="tab-panel hidden">
+          <div class="section">
+            <div class="section-header">
+              <div class="filter-bar">
+                <select id="log-filter-selector" class="zone-selector">
+                  <option value="all">All LPR Detections</option>
+                  <option value="in">Active Check-ins Only</option>
+                  <option value="out">Exits & Departures Only</option>
+                </select>
+                <span id="log-records-count" class="count">0 records</span>
+              </div>
+            </div>
+            <div id="lpr-logs-list" style="display: flex; flex-direction: column;">
+              <!-- Dynamically Rendered -->
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ═══════════ TAB D: SUBSCRIPTIONS ═══════════ -->
+        <section id="panel-subscriptions" class="tab-panel hidden">
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">B2B Registered Subscribers</span>
+              <span id="subs-count-label" class="badge badge-purple">0 Passes</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>License Plate</th>
+                    <th>Category</th>
+                    <th>Plan Type</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Amount Paid</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="subs-table-body">
+                  <!-- Dynamically Rendered -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ═══════════ TAB E: ZONE CONFIG ═══════════ -->
+        <section id="panel-config" class="tab-panel hidden">
+          <div class="two-col">
+            <!-- Hardware / IP settings -->
+            <div class="section">
+              <div class="section-header">
+                <span class="section-title">Hardware Device Integrations</span>
+              </div>
+              <div class="detail-panel">
+                <div class="detail-row">
+                  <span class="detail-key">Entry LPR Camera IP</span>
+                  <span id="config-entry-ip" class="detail-val mono">--.---.-.--</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-key">Exit LPR Camera IP</span>
+                  <span id="config-exit-ip" class="detail-val mono">--.---.-.--</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-key">Next Bill Sequence</span>
+                  <span id="config-bill-no" class="detail-val mono">0</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-key">Global Zone ID</span>
+                  <span id="config-zone-id" class="detail-val mono">--</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Operators access -->
+            <div class="section">
+              <div class="section-header">
+                <span class="section-title">Authorized Station Operators</span>
+              </div>
+              <div style="overflow-x: auto;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Operator</th>
+                      <th>Email (Unique ID)</th>
+                      <th>Access Privilege</th>
+                    </tr>
+                  </thead>
+                  <tbody id="config-operators-body">
+                    <!-- Dynamically Rendered -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ─── 4. CLIENT JAVASCRIPT LOGIC ─── -->
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: 'AIzaSyBzvu6RbIWB3WisORrJBaZdZAD8YIuPR18',
+      authDomain: 'imai-parking.firebaseapp.com',
+      projectId: 'imai-parking',
+      storageBucket: 'imai-parking.appspot.com',
+      messagingSenderId: '729240789760',
+      appId: '1:729240789760:web:76bf95752d740d8af3c9e5'
+    };
+
+    // Initialize Firebase Compat SDK
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    // Client-Side Application State
+    const state = {
+      user: null,
+      zones: [],
+      activeZoneId: 'DemoParking',
+      zoneVehicles: [], // subscription records
+      logEntries: [],   // LPR device logs
+      pricingConfig: null,
+      ticketCounter: 0,
+      lastBillNo: 0,
+      spots: [],        // dynamically derived slot grid
+      globalVehicles: [], // dynamically derived parked cars
+      customers: [],     // zone operators
+      selectedSpot: null,
+      activeTab: 'overview',
+      logFilter: 'all',
+      activeZoneDoc: null,
+      activeZoneInfo: null
+    };
+
+    // Active subcollection event unsubscribers (for tearing down listeners when switching zones)
+    let activeZoneUnsubs = [];
+
+    // Utility: Date formatter
+    function tsToStr(val) {
+      if (!val) return null;
+      if (typeof val === 'string') return val;
+      if (val.seconds) return new Date(val.seconds * 1000).toISOString();
+      if (val.toDate) return val.toDate().toISOString();
+      return String(val);
+    }
+
+    function fmtTime(ts) {
+      const str = tsToStr(ts);
+      if (!str) return '—';
+      return new Date(str).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function fmtDateTime(ts) {
+      const str = tsToStr(ts);
+      if (!str) return '—';
+      const d = new Date(str);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function elapsed(ts) {
+      const str = tsToStr(ts);
+      if (!str) return '—';
+      const diff = Date.now() - new Date(str).getTime();
+      if (diff < 0 || isNaN(diff)) return '—';
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      if (d > 0) return `${d}d ${h}h`;
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+
+    // Dynamic Fee Calculator matching Settings/Pricing exactly
+    function computeFee(inTimeVal, pricingConfig) {
+      if (!inTimeVal || !pricingConfig) return null;
+
+      let inMs;
+      if (inTimeVal && inTimeVal.seconds) {
+        inMs = inTimeVal.seconds * 1000;
+      } else if (inTimeVal && inTimeVal.toDate) {
+        inMs = inTimeVal.toDate().getTime();
+      } else {
+        inMs = new Date(inTimeVal).getTime();
+      }
+      if (isNaN(inMs)) return null;
+
+      const diffMs = Date.now() - inMs;
+      if (diffMs < 0) return null;
+      const diffMins = diffMs / 60000;
+
+      const graceMins = pricingConfig.gracePeriodMins || 0;
+      if (diffMins <= graceMins) return 0;
+
+      const totalHours = diffMins / 60;
+      const blocks = pricingConfig.timeBlocks || [];
+      const dailyCap = pricingConfig.dailyMaxCap || Infinity;
+
+      if (!blocks.length) return null;
+
+      const sorted = [...blocks].sort((a, b) => (a.upToHours || 0) - (b.upToHours || 0));
+
+      let fee = 0;
+      let prevBoundary = 0;
+
+      for (let i = 0; i < sorted.length; i++) {
+        const block = sorted[i];
+        const boundary = block.upToHours || 0;
+        const isLast = i === sorted.length - 1;
+
+        let tierHours;
+        if (isLast) {
+          tierHours = Math.max(0, totalHours - prevBoundary);
+        } else {
+          tierHours = Math.max(0, Math.min(totalHours, boundary) - prevBoundary);
+        }
+
+        if (tierHours <= 0 && !isLast) {
+          prevBoundary = boundary;
+          continue;
+        }
+
+        if (block.isFlatRate) {
+          fee += block.rate || 0;
+        } else {
+          fee += Math.ceil(tierHours) * (block.rate || 0);
+        }
+
+        prevBoundary = boundary;
+        if (totalHours <= boundary && !isLast) break;
+      }
+
+      return Math.min(Math.round(fee), dailyCap);
+    }
+
+    function calcFee(inTime) {
+      const fee = computeFee(inTime, state.pricingConfig);
+      if (fee === null) return '—';
+      return `₹${fee.toLocaleString('en-IN')}`;
+    }
+
+    // Dynamic spots grid layout generator
+    function deriveSpots() {
+      const parkedList = state.logEntries.filter(e => e.checkin_status);
+      state.globalVehicles = parkedList.map(e => ({
+        id: e.id,
+        vehicle_no: e.vehicle_no,
+        status: 'parked',
+        in_time: e.timestamp,
+        vehicle_type: e.vehicle_type || '2W'
+      }));
+
+      const totalSpots = 12;
+      const generatedSpots = [];
+
+      for (let i = 1; i <= totalSpots; i++) {
+        const spotId = `A-${String(i).padStart(2, '0')}`;
+        const vehicle = parkedList[i - 1];
+        if (vehicle) {
+          generatedSpots.push({
+            id: spotId,
+            spot_id: spotId,
+            status: 'Occupied',
+            active_vehicle_no: vehicle.vehicle_no,
+            type: vehicle.vehicle_type || '2W',
+            logData: vehicle
+          });
+        } else {
+          generatedSpots.push({
+            id: spotId,
+            spot_id: spotId,
+            status: i === 7 ? 'Reserved' : 'Vacant',
+            active_vehicle_no: null,
+            type: null
+          });
+        }
+      }
+      state.spots = generatedSpots;
+
+      // Keep current selection alive if exists
+      if (state.selectedSpot) {
+        const updated = state.spots.find(s => s.id === state.selectedSpot.id);
+        if (updated) state.selectedSpot = updated;
+      }
+    }
+
+    // Tab Switching Logic
+    function handleTabClick(e) {
+      const tabId = e.currentTarget.getAttribute('data-tab');
+      state.activeTab = tabId;
+
+      // Toggle tab classes
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+
+      // Toggle panels
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`panel-${tabId}`).classList.remove('hidden');
+
+      renderTab(tabId);
+    }
+
+    // Google Sign-In trigger
+    async function doSignIn() {
+      const loginBtn = document.getElementById('login-btn');
+      const loginBtnText = document.getElementById('login-btn-text');
+      const authError = document.getElementById('auth-error');
+
+      loginBtn.disabled = true;
+      loginBtnText.textContent = 'Authenticating Securely...';
+      authError.classList.add('hidden');
+
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+      } catch (err) {
+        console.error("Sign-in error:", err);
+        authError.textContent = err.message || 'Google Authentication failed. Please try again.';
+        authError.classList.remove('hidden');
+        loginBtn.disabled = false;
+        loginBtnText.textContent = 'Sign in with Google';
+      }
+    }
+
+    // Sign out trigger
+    async function doSignOut() {
+      try {
+        // Tear down active listeners
+        activeZoneUnsubs.forEach(unsub => unsub());
+        activeZoneUnsubs = [];
+        await auth.signOut();
+      } catch (err) {
+        console.error("Sign-out error:", err);
+      }
+    }
+
+    // Toggle main access wrapper UI
+    function renderAuth() {
+      const loginScreen = document.getElementById('login-screen');
+      const authLoading = document.getElementById('auth-loading');
+      const dashboardWrapper = document.getElementById('dashboard-wrapper');
+
+      authLoading.classList.add('hidden');
+
+      if (state.user) {
+        loginScreen.classList.add('hidden');
+        dashboardWrapper.classList.remove('hidden');
+        document.getElementById('user-email-label').textContent = state.user.email;
+      } else {
+        dashboardWrapper.classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+        document.getElementById('login-btn').disabled = false;
+        document.getElementById('login-btn-text').textContent = 'Sign in with Google';
+      }
+    }
+
+    // Main real-time loader sequence
+    async function loadAll() {
+      document.getElementById('data-loading').classList.remove('hidden');
+      document.getElementById('live-indicator-dot').classList.add('loading');
+      document.getElementById('live-indicator-label').textContent = 'Syncing…';
+
+      try {
+        // 1. Load zones first (real-time listener)
+        db.collection('ParkingZones').onSnapshot(snap => {
+          state.zones = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          populateZoneSelector();
+          
+          const currentZone = state.zones.find(z => z.id === state.activeZoneId) || state.zones[0];
+          if (currentZone && currentZone.id !== state.activeZoneId) {
+            state.activeZoneId = currentZone.id;
+            document.getElementById('zone-selector').value = currentZone.id;
+          }
+          
+          state.activeZoneInfo = currentZone;
+          setupZoneDataListeners(state.activeZoneId);
+        }, err => {
+          console.error("Zones load error:", err);
+          document.getElementById('live-indicator-label').textContent = 'Connection Error';
+        });
+
+        // 2. Load Customers/operators directory resiliently (try/catch + fallback)
+        try {
+          db.collection('Customers').onSnapshot(snap => {
+            state.customers = snap.docs.map(doc => ({ id: doc.id, email: doc.id, ...doc.data() }));
+            renderConfigOperators();
+          }, err => {
+            console.warn("Global operator directory permission restricted. Falling back to active session user.");
+            applyCustomerFallback();
+          });
+        } catch {
+          applyCustomerFallback();
+        }
+
+      } catch (err) {
+        console.error("Global load error:", err);
+      }
+    }
+
+    function applyCustomerFallback() {
+      if (state.user) {
+        state.customers = [{
+          id: state.user.email,
+          email: state.user.email,
+          name: state.user.displayName || 'Access Station User',
+          parking_access: [state.activeZoneId]
+        }];
+      } else {
+        state.customers = [];
+      }
+      renderConfigOperators();
+    }
+
+    // Populate drop-down selector
+    function populateZoneSelector() {
+      const selector = document.getElementById('zone-selector');
+      const val = selector.value || state.activeZoneId;
+      selector.innerHTML = '';
+      state.zones.forEach(z => {
+        const opt = document.createElement('option');
+        opt.value = z.id;
+        opt.textContent = z.name || z.id;
+        selector.appendChild(opt);
+      });
+      selector.value = val;
+    }
+
+    // Setting up active real-time listeners for active Zone subcollections
+    function setupZoneDataListeners(zoneId) {
+      // Clean up previous listeners
+      activeZoneUnsubs.forEach(unsub => unsub());
+      activeZoneUnsubs = [];
+
+      document.getElementById('data-loading').classList.remove('hidden');
+
+      // 1. Subscriptions Listener
+      const subUnsub = db.collection('ParkingZones').doc(zoneId).collection('Vehicles').onSnapshot(snap => {
+        state.zoneVehicles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderTab(state.activeTab);
+      }, () => {
+        state.zoneVehicles = [];
+        renderTab(state.activeTab);
+      });
+      activeZoneUnsubs.push(subUnsub);
+
+      // 2. Counter Listener
+      const counterUnsub = db.collection('ParkingZones').doc(zoneId).collection('Counters').doc('TicketCounter').onSnapshot(doc => {
+        state.ticketCounter = doc.exists ? (doc.data().currentValue || 0) : 0;
+        renderOverviewStats();
+      }, () => {
+        state.ticketCounter = 0;
+        renderOverviewStats();
+      });
+      activeZoneUnsubs.push(counterUnsub);
+
+      // 3. Metadata Listener
+      const metaUnsub = db.collection('ParkingZones').doc(zoneId).collection('Metadata').doc('BillCounter').onSnapshot(doc => {
+        state.lastBillNo = doc.exists ? (doc.data().lastBillNo || 0) : 0;
+        renderTab(state.activeTab);
+      }, () => {
+        state.lastBillNo = 0;
+        renderTab(state.activeTab);
+      });
+      activeZoneUnsubs.push(metaUnsub);
+
+      // 4. Pricing Config Listener
+      const pricingUnsub = db.collection('ParkingZones').doc(zoneId).collection('Settings').doc('Pricing').onSnapshot(doc => {
+        state.pricingConfig = doc.exists ? doc.data() : null;
+        renderTab(state.activeTab);
+      }, () => {
+        state.pricingConfig = null;
+        renderTab(state.activeTab);
+      });
+      activeZoneUnsubs.push(pricingUnsub);
+
+      // 5. Time-Series Logs/Entries Listener
+      const logsUnsub = db.collection('ParkingZones').doc(zoneId).collection('Logs').doc('2024').collection('Months').doc('01').collection('Entries').onSnapshot(snap => {
+        state.logEntries = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => {
+          const ta = new Date(tsToStr(a.timestamp) || 0).getTime();
+          const tb = new Date(tsToStr(b.timestamp) || 0).getTime();
+          return tb - ta;
+        });
+
+        deriveSpots();
+        
+        // Remove loading state
+        document.getElementById('data-loading').classList.add('hidden');
+        document.getElementById('live-indicator-dot').classList.remove('loading');
+        document.getElementById('live-indicator-label').textContent = 'Live';
+
+        renderTab(state.activeTab);
+      }, err => {
+        console.error("Logs update listener failed:", err);
+        state.logEntries = [];
+        deriveSpots();
+        document.getElementById('data-loading').classList.add('hidden');
+        renderTab(state.activeTab);
+      });
+      activeZoneUnsubs.push(logsUnsub);
+    }
+
+    // Router matching active tab clicks
+    function renderTab(tabId) {
+      if (tabId === 'overview') {
+        renderOverviewStats();
+        renderOverviewGrid();
+        renderOverviewParkedTable();
+        renderOverviewDetailPanel();
+      } else if (tabId === 'billing') {
+        renderBillingOverview();
+      } else if (tabId === 'logs') {
+        renderLogsOverview();
+      } else if (tabId === 'subscriptions') {
+        renderSubscriptionsOverview();
+      } else if (tabId === 'config') {
+        renderConfigOverview();
+      }
+    }
+
+    // ─── OVERVIEW TAB RENDERING ───
+    function renderOverviewStats() {
+      const occupied = state.spots.filter(s => s.status === 'Occupied').length;
+      const vacant = state.spots.filter(s => s.status === 'Vacant').length;
+      const reserved = state.spots.filter(s => s.status === 'Reserved').length;
+      const total = state.spots.length;
+      const occupancyPct = total ? Math.round((occupied / total) * 100) : 0;
+      const subs = state.zoneVehicles.filter(v => v.active).length;
+
+      document.getElementById('stat-total-spaces').textContent = total;
+      document.getElementById('stat-occupied').textContent = occupied;
+      document.getElementById('stat-vacant').textContent = vacant;
+      document.getElementById('stat-reserved').textContent = reserved;
+      document.getElementById('stat-tickets').textContent = state.ticketCounter;
+      document.getElementById('stat-subs').textContent = subs;
+      document.getElementById('stat-occupancy-pct').textContent = `${occupancyPct}% Utilisation`;
+      document.getElementById('parked-count-label').textContent = `${occupied} Vehicles Inside`;
+    }
+
+    function renderOverviewGrid() {
+      const container = document.getElementById('spot-grid-map');
+      container.innerHTML = '';
+
+      if (!state.spots.length) {
+        container.innerHTML = '<div class="empty" style="grid-column: 1/-1;">No spaces registered.</div>';
+        return;
+      }
+
+      state.spots.forEach(s => {
+        const el = document.createElement('div');
+        el.className = `spot ${s.status === 'Occupied' ? 'spot-occupied' : (s.status === 'Reserved' ? 'spot-reserved' : 'spot-vacant')}`;
+        if (state.selectedSpot && state.selectedSpot.id === s.id) {
+          el.classList.add('spot-selected');
+        }
+
+        el.innerHTML = `
+          <span class="spot-id">${s.spot_id}</span>
+          <span class="spot-type">${s.type || s.status}</span>
+        `;
+
+        el.addEventListener('click', () => {
+          state.selectedSpot = s;
+          document.querySelectorAll('.spot').forEach(spotEl => spotEl.classList.remove('spot-selected'));
+          el.classList.add('spot-selected');
+          renderOverviewDetailPanel();
+        });
+
+        container.appendChild(el);
+      });
+    }
+
+    function renderOverviewDetailPanel() {
+      const panel = document.getElementById('spot-detail-panel');
+      const s = state.selectedSpot;
+
+      if (!s) {
+        panel.innerHTML = '<div class="empty">Select an occupied or vacant slot on the map grid to view stay parameters.</div>';
+        return;
+      }
+
+      const activeBadgeClass = s.status === 'Occupied' ? 'badge-red' : (s.status === 'Reserved' ? 'badge-amber' : 'badge-green');
+      let vehicleHTML = '';
+
+      if (s.status === 'Occupied' && s.logData) {
+        const duration = elapsed(s.logData.timestamp);
+        const charge = calcFee(s.logData.timestamp);
+        const sub = state.zoneVehicles.find(v => v.vehicleno === s.logData.vehicle_no && v.active);
+
+        vehicleHTML = `
+          <div class="detail-row" style="border-top: 1px solid var(--border); margin-top: 8px; padding-top: 14px;">
+            <span class="detail-key">Scanned Vehicle</span>
+            <span class="plate">${s.logData.vehicle_no}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-key">Stay Duration</span>
+            <span class="detail-val mono" style="color: var(--green); font-weight: 700;">${duration}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-key">Est. Amount Due</span>
+            <span class="fee-amount">${charge}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-key">Member Pass?</span>
+            <span class="badge ${sub ? 'badge-purple' : 'badge-gray'}">${sub ? 'Subscribed Pass' : 'Visitor (Normal)'}</span>
+          </div>
+          ${s.logData.photo_url ? `
+            <div style="margin-top: 10px;">
+              <span class="detail-key" style="display: block; margin-bottom: 6px;">LPR Entry Camera Capture</span>
+              <a href="${s.logData.photo_url}" target="_blank">
+                <img src="${s.logData.photo_url}" class="img-thumb" style="width: 100%; height: 110px; border-radius: 8px;" alt="LPR Recognition">
+              </a>
+            </div>
+          ` : ''}
+        `;
+      }
+
+      panel.innerHTML = `
+        <div class="detail-row">
+          <span class="detail-key">Space ID</span>
+          <span class="detail-val mono" style="font-weight: 700;">${s.spot_id}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-key">Physical Status</span>
+          <span class="badge ${activeBadgeClass}">${s.status}</span>
+        </div>
+        ${vehicleHTML}
+      `;
+    }
+
+    function renderOverviewParkedTable() {
+      const body = document.getElementById('currently-parked-table-body');
+      body.innerHTML = '';
+
+      const parked = state.logEntries.filter(e => e.checkin_status);
+
+      if (!parked.length) {
+        body.innerHTML = '<tr><td colspan="6" class="empty">No vehicles are currently parked inside the zone lot.</td></tr>';
+        return;
+      }
+
+      parked.forEach(v => {
+        const duration = elapsed(v.timestamp);
+        const charge = calcFee(v.timestamp);
+        const sub = state.zoneVehicles.find(pass => pass.vehicleno === v.vehicle_no && pass.active);
+
+        // pricing breakdown
+        let tierLabel = '—';
+        if (state.pricingConfig) {
+          const hours = (Date.now() - new Date(tsToStr(v.timestamp)).getTime()) / 3600000;
+          const blocks = state.pricingConfig.timeBlocks || [];
+          const sorted = [...blocks].sort((a, b) => (a.upToHours || 0) - (b.upToHours || 0));
+          for (const b of sorted) {
+            if (hours <= b.upToHours) {
+              tierLabel = b.isFlatRate ? `Flat ₹${b.rate}` : `₹${b.rate}/hr`;
+              break;
+            }
+          }
+          if (tierLabel === '—' && sorted.length) {
+            const last = sorted[sorted.length - 1];
+            tierLabel = last.isFlatRate ? `Flat ₹${last.rate}` : `₹${last.rate}/hr`;
+          }
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="flex">
+              <span class="plate">${v.vehicle_no}</span>
+              ${sub ? '<span class="badge badge-purple" style="padding: 1px 6px; font-size: 9px;">Sub</span>' : ''}
+            </div>
+          </td>
+          <td>${v.vehicle_type || '2W'}</td>
+          <td class="mono">${fmtDateTime(v.timestamp)}</td>
+          <td class="mono" style="font-weight: 600; color: var(--green);">${duration}</td>
+          <td class="mono">${tierLabel}</td>
+          <td><span class="fee-amount" style="font-size: 13px;">${charge}</span></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    // ─── BILLING TAB RENDERING ───
+    function renderBillingOverview() {
+      const checkoutExits = state.logEntries.filter(e => !e.checkin_status);
+      const totalCollected = checkoutExits.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      const activeParked = state.logEntries.filter(e => e.checkin_status);
+      const liveDues = activeParked.reduce((sum, v) => sum + (computeFee(v.timestamp, state.pricingConfig) || 0), 0);
+      const activeSubsCount = state.zoneVehicles.filter(v => v.active).length;
+      const subMRR = state.zoneVehicles.filter(v => v.active).reduce((sum, v) => sum + (parseFloat(v.amount) || 0), 0);
+
+      document.getElementById('bill-total-collected').textContent = `₹${totalCollected.toLocaleString('en-IN')}`;
+      document.getElementById('bill-live-dues').textContent = `₹${liveDues.toLocaleString('en-IN')}`;
+      document.getElementById('bill-sub-revenue').textContent = `₹${subMRR.toLocaleString('en-IN')}`;
+      document.getElementById('bill-paid-exits').textContent = checkoutExits.length;
+
+      // Render Pricing Tiers list
+      const pricingList = document.getElementById('billing-pricing-list');
+      pricingList.innerHTML = '';
+      if (!state.pricingConfig) {
+        pricingList.innerHTML = '<div class="empty">No pricing rules defined for this zone.</div>';
+      } else {
+        const sorted = [...(state.pricingConfig.timeBlocks || [])].sort((a, b) => (a.upToHours || 0) - (b.upToHours || 0));
+
+        let blocksHTML = '';
+        sorted.forEach((b, i) => {
+          blocksHTML += `
+            <div class="pricing-tier">
+              <span class="pricing-label">Tier ${i + 1}: Stay up to ${b.upToHours} Hours</span>
+              <span class="pricing-val">${b.isFlatRate ? `Flat ₹${b.rate}` : `₹${b.rate}/hr`}</span>
+            </div>
+          `;
+        });
+
+        pricingList.innerHTML = `
+          <div class="pricing-tier" style="background: rgba(76, 175, 80, 0.04); border-color: rgba(76, 175, 80, 0.2);">
+            <span class="pricing-label" style="font-weight: 600; color: var(--green);">Grace Buffer period</span>
+            <span class="pricing-val" style="color: var(--green);">${state.pricingConfig.gracePeriodMins || 0} Minutes</span>
+          </div>
+          <div class="pricing-tier">
+            <span class="pricing-label" style="font-weight: 600;">Daily Maximum Cap (24h)</span>
+            <span class="pricing-val" style="color: var(--text);">₹${state.pricingConfig.dailyMaxCap || 500}</span>
+          </div>
+          <div style="margin-top: 18px; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; color: var(--text-2);">Standard Dynamic Tiers</div>
+          ${blocksHTML}
+        `;
+      }
+
+      // Render recent payments
+      const historyBody = document.getElementById('billing-paid-history-body');
+      historyBody.innerHTML = '';
+
+      if (!checkoutExits.length) {
+        historyBody.innerHTML = '<tr><td colspan="4" class="empty">No recent paid logs recorded.</td></tr>';
+        return;
+      }
+
+      checkoutExits.forEach(e => {
+        let elapsedHoursStr = '—';
+        if (e.checkOutTime && e.timestamp) {
+          const diff = new Date(tsToStr(e.checkOutTime)).getTime() - new Date(tsToStr(e.timestamp)).getTime();
+          if (diff >= 0) {
+            const h = Math.floor(diff / 3600000);
+            const m = Math.floor((diff % 3600000) / 60000);
+            elapsedHoursStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+          }
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="plate">${e.vehicle_no}</span></td>
+          <td class="mono">${elapsedHoursStr}</td>
+          <td><span class="badge badge-gray">${e.paymentMethod || 'Cash'}</span></td>
+          <td class="mono" style="font-weight: 700; color: var(--text);">₹${e.amount || 0}</td>
+        `;
+        historyBody.appendChild(tr);
+      });
+    }
+
+    // ─── TIMELINE LOGS TAB RENDERING ───
+    function renderLogsOverview() {
+      const container = document.getElementById('lpr-logs-list');
+      container.innerHTML = '';
+
+      const filter = state.logFilter;
+      const filtered = state.logEntries.filter(e => {
+        if (filter === 'in') return e.checkin_status;
+        if (filter === 'out') return !e.checkin_status;
+        return true;
+      });
+
+      document.getElementById('log-records-count').textContent = `${filtered.length} records`;
+
+      if (!filtered.length) {
+        container.innerHTML = '<div class="empty">No timeline logs matching the selected filter query exist.</div>';
+        return;
+      }
+
+      filtered.forEach(e => {
+        const item = document.createElement('div');
+        item.className = 'log-entry';
+
+        const dotColor = e.checkin_status ? 'var(--green)' : 'var(--text-3)';
+        const statusText = e.checkin_status ? 'CHECK-IN' : 'CHECK-OUT';
+        const statusBadgeClass = e.checkin_status ? 'badge-green' : 'badge-gray';
+
+        const mainText = e.checkin_status 
+          ? `Vehicle entered and parsed by entry gate camera.`
+          : `Vehicle checked out at exit gate.`;
+
+        item.innerHTML = `
+          <div class="log-dot" style="color: ${dotColor};"></div>
+          <div class="log-body">
+            <div class="log-main">
+              <span class="plate" style="margin-right: 8px;">${e.vehicle_no}</span>
+              <span class="badge ${statusBadgeClass}">${statusText}</span>
+            </div>
+            <div class="log-sub">${mainText} Category: <strong>${e.vehicle_type || '2W'}</strong></div>
+            ${e.photo_url || e.payment_url ? `
+              <div style="margin-top: 8px; display: flex; gap: 8px;">
+                ${e.photo_url ? `
+                  <a href="${e.photo_url}" target="_blank" title="View Entry Snapshot">
+                    <img src="${e.photo_url}" class="img-thumb" alt="Entry Snapshot">
+                  </a>
+                ` : ''}
+                ${e.payment_url ? `
+                  <a href="${e.payment_url}" target="_blank" title="View Exit Receipt">
+                    <img src="${e.payment_url}" class="img-thumb" alt="Exit Receipt">
+                  </a>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>
+          <div class="log-right">
+            <div class="log-time">${fmtDateTime(e.timestamp)}</div>
+            ${!e.checkin_status ? `<div class="log-amount" style="color: var(--green); margin-top: 4px;">₹${e.amount || 0}</div>` : ''}
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // ─── SUBSCRIPTIONS TAB RENDERING ───
+    function renderSubscriptionsOverview() {
+      const body = document.getElementById('subs-table-body');
+      body.innerHTML = '';
+
+      document.getElementById('subs-count-label').textContent = `${state.zoneVehicles.length} Passes`;
+
+      if (!state.zoneVehicles.length) {
+        body.innerHTML = '<tr><td colspan="7" class="empty">No subscriber passes registered in this zone database.</td></tr>';
+        return;
+      }
+
+      state.zoneVehicles.forEach(s => {
+        const statusBadgeClass = s.active ? 'badge-green' : 'badge-red';
+        const statusText = s.active ? 'Active Pass' : 'Expired';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="plate">${s.vehicleno}</span></td>
+          <td>${s.vehicletype || '2W'}</td>
+          <td style="font-weight: 500;">${s.subscription || 'Monthly'}</td>
+          <td class="mono">${s.substartdate || '—'}</td>
+          <td class="mono">${s.subenddate || '—'}</td>
+          <td class="mono" style="font-weight: 700;">₹${parseInt(s.amount || 0).toLocaleString('en-IN')}</td>
+          <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    // ─── ZONE CONFIG TAB RENDERING ───
+    function renderConfigOverview() {
+      const info = state.activeZoneInfo || {};
+
+      document.getElementById('config-entry-ip').textContent = info.entry_ip || '—';
+      document.getElementById('config-exit-ip').textContent = info.exit_ip || '—';
+      document.getElementById('config-bill-no').textContent = state.lastBillNo;
+      document.getElementById('config-zone-id').textContent = state.activeZoneId;
+
+      renderConfigOperators();
+    }
+
+    function renderConfigOperators() {
+      const body = document.getElementById('config-operators-body');
+      body.innerHTML = '';
+
+      const zoneUsers = state.customers.filter(c => (c.parking_access || []).includes(state.activeZoneId));
+
+      if (!zoneUsers.length) {
+        body.innerHTML = '<tr><td colspan="3" class="empty">No authorized operators assigned for this zone.</td></tr>';
+        return;
+      }
+
+      zoneUsers.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight: 600; color: var(--text);">${u.name || 'Unnamed Operator'}</td>
+          <td class="mono">${u.email}</td>
+          <td><span class="badge badge-green">Lot Operator Access</span></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    // ─── AUTH STATE OBSERVER ───
+    auth.onAuthStateChanged(user => {
+      state.user = user;
+      renderAuth();
+      if (user) {
+        loadAll();
+      }
+    });
+
+    // ─── EVENT INITIALISERS ───
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Tab switches
+      document.querySelectorAll('.nav-tab').forEach(t => {
+        t.addEventListener('click', handleTabClick);
+      });
+
+      // 2. Zone selector change
+      document.getElementById('zone-selector').addEventListener('change', (e) => {
+        state.activeZoneId = e.target.value;
+        state.activeZoneInfo = state.zones.find(z => z.id === state.activeZoneId);
+        setupZoneDataListeners(state.activeZoneId);
+      });
+
+      // 3. Log filter change
+      document.getElementById('log-filter-selector').addEventListener('change', (e) => {
+        state.logFilter = e.target.value;
+        renderLogsOverview();
+      });
+
+      // 4. Auth Button triggers
+      document.getElementById('login-btn').addEventListener('click', doSignIn);
+      document.getElementById('signout-btn').addEventListener('click', doSignOut);
+
+      // 5. Run Live Clock
+      setInterval(() => {
+        const now = new Date();
+        document.getElementById('live-clock').textContent = now.toLocaleTimeString([], {
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+      }, 1000);
+
+      // 6. Fee calculation auto-refresh (re-render tabs every 30 seconds for elapsed stay increments)
+      setInterval(() => {
+        if (state.activeTab === 'overview') {
+          renderOverviewStats();
+          renderOverviewParkedTable();
+          renderOverviewDetailPanel();
+        }
+      }, 30000);
+    });
+
+  </script>
+</body>
+</html>
