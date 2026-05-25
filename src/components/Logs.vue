@@ -48,6 +48,15 @@ const filteredLogs = computed(() => {
                 Paid: ₹{{ log.fee_paid || 0 }}
               </span>
             </div>
+            <!-- Snapshot Thumbnails -->
+            <div v-if="log.photo_url || log.payment_url" style="margin-top: 8px; display: flex; gap: 8px;">
+              <a v-if="log.photo_url" :href="log.photo_url" target="_blank" title="View Entry Snapshot">
+                <img :src="log.photo_url" class="img-thumb" style="width: 60px; height: 40px; border-radius: 4px; object-fit: cover;" alt="Entry Snapshot" />
+              </a>
+              <a v-if="log.payment_url" :href="log.payment_url" target="_blank" title="View Exit Receipt">
+                <img :src="log.payment_url" class="img-thumb" style="width: 60px; height: 40px; border-radius: 4px; object-fit: cover;" alt="Exit Receipt" />
+              </a>
+            </div>
           </div>
           <div class="lpr-type">
             <span class="badge" :class="log.checkin_status ? 'badge-amber' : 'badge-green'">

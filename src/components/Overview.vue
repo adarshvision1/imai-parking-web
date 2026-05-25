@@ -150,11 +150,17 @@ const selectSpot = (spot) => {
                 <span class="detail-key">Current Stay</span>
                 <span class="detail-val">{{ formatStay(state.selectedSpot.logData.timestamp) }}</span>
               </div>
-              <div class="detail-row" style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border);">
+              <div class="detail-row" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border);">
                 <span class="detail-key">Live Accrued Fee</span>
                 <span class="detail-val" style="font-size: 18px; font-weight: 600; color: var(--red);">
                   {{ getFee(state.selectedSpot.logData.timestamp) }}
                 </span>
+              </div>
+              <div v-if="state.selectedSpot.logData.photo_url" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;">
+                <span class="detail-key" style="display: block; margin-bottom: 6px;">LPR Entry Camera Capture</span>
+                <a :href="state.selectedSpot.logData.photo_url" target="_blank" title="View Entry Snapshot">
+                  <img :src="state.selectedSpot.logData.photo_url" class="img-thumb" style="width: 100%; height: 110px; border-radius: 8px; object-fit: cover;" alt="LPR Recognition" />
+                </a>
               </div>
             </template>
           </div>
