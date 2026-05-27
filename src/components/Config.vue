@@ -1,8 +1,11 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useParkingData } from '../composables/useParkingData'
 
-const { state } = useParkingData()
+const { state, seedDatabase } = useParkingData()
+const loading = ref(false)
+const successMsg = ref('')
+const errorMsg = ref('')
 
 const activeZone = computed(() => {
   return state.zones.find(z => z.id === state.activeZoneId) || {}
@@ -13,6 +16,20 @@ const operators = computed(() => {
     c.parking_access && c.parking_access.includes(state.activeZoneId)
   )
 })
+
+const handleSeed = async () => {
+  loading.value = true
+  successMsg.value = ''
+  errorMsg.value = ''
+  try {
+    await seedDatabase()
+    successMsg.value = '🎉 Success! Your new Firebase project has been seeded with standard demo zones, logs, active parkers, subscription passes, and operators. The dashboard has refreshed!'
+  } catch (err) {
+    errorMsg.value = `❌ Failed to seed database: ${err.message}. Make sure your Firestore security rules allow writes.`
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
@@ -69,6 +86,35 @@ const operators = computed(() => {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Database Initialization / Seeding -->
+    <div class="section" style="margin-top: 18px;">
+      <div class="section-header">
+        <span class="section-title">Database Utility Console</span>
+      </div>
+      <div class="detail-panel" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+        <div style="flex: 1; min-width: 280px;">
+          <h4 style="margin: 0 0 6px 0; color: var(--text-1); font-weight: 600;">Fresh Firebase Project Seeder</h4>
+          <p style="margin: 0; font-size: 13px; color: var(--text-2); line-height: 1.5;">
+            Connected to a brand new, empty, or freshly-provisioned Firebase project? Click "Seed Database" to instantly populate it with realistic collections, active subscription passes, LPR diagnostic logs, and operator lists.
+          </p>
+        </div>
+        <button 
+          @click="handleSeed" 
+          class="zone-selector" 
+          style="background: rgb(76, 175, 80); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; cursor: pointer; height: auto;"
+          :disabled="loading"
+        >
+          {{ loading ? 'Seeding Database...' : 'Seed Firestore with Demo Data' }}
+        </button>
+      </div>
+      <div v-if="successMsg" style="margin-top: 12px; color: rgb(76, 175, 80); font-size: 13px; font-weight: 500; line-height: 1.4;">
+        {{ successMsg }}
+      </div>
+      <div v-if="errorMsg" style="margin-top: 12px; color: var(--red); font-size: 13px; font-weight: 500; line-height: 1.4;">
+        {{ errorMsg }}
       </div>
     </div>
   </section>
